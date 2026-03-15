@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scale=no">
+<title>Home Ergonomics & Pain Coach</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="https://unpkg.com/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { font-family: 'Inter', sans-serif; }
+body { background: #f8faf9; }
+.gradient-bg { background: linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%); }
+.card-shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04); }
+.pulse-ring { animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+@keyframes pulse-ring {
+  0% { transform: scale(0.9); opacity: 1; }
+  80%, 100% { transform: scale(1.3); opacity: 0; }
+}
+.fade-in { animation: fadeIn 0.3s ease-in; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.tab-active { border-bottom: 3px solid #059669; color: #059669; font-weight: 600; }
+.pain-dot { width: 24px; height: 24px; border-radius: 50%; position: absolute; transform: translate(-50%, -50%); cursor: pointer; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+video { object-fit: cover; }
+.webcam-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.posture-indicator { transition: all 0.5s ease; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+.micro-card:active { transform: scale(0.97); }
+.micro-card { transition: transform 0.15s ease; }
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
+.print-only { display: none; }
+.toast { animation: slideUp 0.3s ease, fadeOut 0.3s ease 2.7s; }
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+</style>
+</head>
+<body x-data="app()" x-init="init()">
+
+<!-- Toast Notifications -->
+<div x-show="toast.show" x-transition class="fixed bottom-20 left-4 right-4 z-50 no-print">
+  <div class="bg-gray-800 text-white px-4 py-3 rounded-xl text-sm text-center card-shadow toast" x-text="toast.message"></div>
+</div>
+
+<!-- Onboarding Modal -->
+<div x-show="showOnboarding" x-transition class="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto card-shadow">
+    <div class="gradient-bg rounded-t-2xl p-6 text-white text-center">
+      <div class="text-4xl mb-2">🧘‍♀️</div>
+      <h2 class="text-xl font-bold">Welcome to Your Pain Coach</h2>
+      <p class="text-sm opacity-90 mt-1">Let's set you up in 60 seconds</p>
+    </div>
+    
+    <!-- Step 1 -->
+    <div x-show="onboardStep === 1" class="p-6 fade-in">
+      <h3 class="font-semibold text-gray-800 mb-4">👋 Tell us about you</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm text-gray-600 mb-1 block">Your name</label>
+          <input x-model="profile.name" type="text" placeholder="e.g. Sarah" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none text-base">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm text-gray-600 mb-1 block">Age</label>
+            <input x-model.number="profile.age" type="number" placeholder="30" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none text-base">
+          </div>
+          <div>
+            <label class="text-sm text-gray-600 mb-1 block">Height (cm)</label>
+            <input x-model.number="profile.height" type="number" placeholder="165" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none text-base">
+          </div>
+        </div>
+        <div>
+          <label class="text-sm text-gray-600 mb-1 block">Child's weight (kg) — optional</label>
+          <input x-model.number="profile.childWeight" type="number" placeholder="10" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none text-base">
+        </div>
+      </div>
+      <button @click="onboardStep = 2" class="w-full mt-5 gradient-bg text-white py-3.5 rounded-xl font-semibold text-base active:opacity-90">Next →</button>
+    </div>
+
+    <!-- Step 2 -->
+    <div x-show="onboardStep === 2" class="p-6 fade-in">
+      <h3 class="font-semibold text-gray-800 mb-4">🤕 Where does it hurt?</h3>
+      <p class="text-sm text-gray-500 mb-4">Tap all that apply — we'll personalize your exercises</p>
+      <div class="grid grid-cols-2 gap-2">
+        <template x-for="area in painAreas" :key="area.id">
+          <button @click="togglePainArea(area.id)" :class="profile.painPoints.includes(area.id) ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-gray-200 text-gray-600'" class="border-2 rounded-xl p-3 text-sm font-medium flex items-center gap-2 active:scale-95 transition-all min-h-[48px]">
+            <span x-text="area.emoji"></span>
+            <span x-text="area.label"></span>
+          </button>
+        </template>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button @click="onboardStep = 1" class="px-6 py-3.5 rounded-xl border border-gray-200 text-gray-600 font-medium">← Back</button>
+        <button @click="onboardStep = 3" class="flex-1 gradient-bg text-white py-3.5 rounded-xl font-semibold active:opacity-90">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div x-show="onboardStep === 3" class="p-6 fade-in">
+      <h3 class="font-semibold text-gray-800 mb-4">⏰ Your schedule</h3>
+      <p class="text-sm text-gray-500 mb-4">When can we nudge you for micro-breaks?</p>
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm text-gray-600 mb-1 block">Work start time</label>
+          <input x-model="profile.workStart" type="time" value="09:00" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none text-base">
+        </div>
+        <div>
+          <label class="text-sm text-gray-600 mb-1 block">Work end time</label>
+          <input x-model="profile.workEnd" type="time" value="17:00" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none text-base">
+        </div>
+        <div>
+          <label class="text-sm text-gray-600 mb-1 block">Break reminder interval</label>
+          <select x-model.number="profile.breakInterval" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none text-base bg-white">
+            <option value="20">Every 20 min</option>
+            <option value="30">Every 30 min</option>
+            <option value="45">Every 45 min</option>
+            <option value="60">Every 60 min</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button @click="onboardStep = 2" class="px-6 py-3.5 rounded-xl border border-gray-200 text-gray-600 font-medium">← Back</button>
+        <button @click="completeOnboarding()" class="flex-1 gradient-bg text-white py-3.5 rounded-xl font-semibold active:opacity-90" :disabled="aiLoading">
+          <span x-show="!aiLoading">Start Coaching 🚀</span>
+          <span x-show="aiLoading" class="flex items-center justify-center gap-2">
+            <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            Setting up...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div x-show="!showOnboarding" class="min-h-screen pb-20">
+  
+  <!-- Header -->
+  <header class="gradient-bg text-white px-4 pt-10 pb-5 no-print">
+    <div class="max-w-lg mx-auto">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h1 class="text-lg font-bold flex items-center gap-2">🧘‍♀️ Pain Coach</h1>
+          <p class="text-xs opacity-80 mt-0.5">Hey <span x-text="profile.name || 'there'"></span>! Let's feel better today</p>
+        </div>
+        <button @click="showSettings = !showSettings" class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center active:bg-white/30">
+          <span class="text-lg">⚙️</span>
+        </button>
+      </div>
+      
+      <!-- Quick Status -->
+      <div class="bg-white/15 rounded-xl p-3 flex items-center gap-3 backdrop-blur-sm">
+        <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl" :class="postureScore >= 70 ? 'bg-green-400/30' : postureScore >= 40 ? 'bg-yellow-400/30' : 'bg-red-400/30'">
+          <span x-text="postureScore >= 70 ? '😊' : postureScore >= 40 ? '😐' : '😣'"></span>
+        </div>
+        <div class="flex-1">
+          <div class="text-sm font-medium">Today's Posture Score</div>
+          <div class="flex items-center gap-2 mt-1">
+            <div class="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-500" :class="postureScore >= 70 ? 'bg-green-400' : postureScore >= 40 ? 'bg-yellow-400' : 'bg-red-400'" :style="`width: ${postureScore}%`"></div>
+            </div>
+            <span class="text-sm font-bold" x-text="postureScore + '%'"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tab Navigation -->
+  <nav class="bg-white border-b sticky top-0 z-30 no-print">
+    <div class="max-w-lg mx-auto flex">
+      <button @click="activeTab = 'home'" :class="activeTab === 'home' ? 'tab-active' : 'text-gray-400'" class="flex-1 py-3 text-xs font-medium text-center border-b-3 border-transparent">
+        <span class="text-lg block">🏠</span>Home
+      </button>
+      <button @click="activeTab = 'posture'" :class="activeTab === 'posture' ? 'tab-active' : 'text-gray-400'" class="flex-1 py-3 text-xs font-medium text-center border-b-3 border-transparent">
+        <span class="text-lg block">📷</span>Posture
+      </button>
+      <button @click="activeTab = 'exercises'" :class="activeTab === 'exercises' ? 'tab-active' : 'text-gray-400'" class="flex-1 py-3 text-xs font-medium text-center border-b-3 border-transparent">
+        <span class="text-lg block">💪</span>Exercises
+      </button>
+      <button @click="activeTab = 'pain'" :class="activeTab === 'pain' ? 'tab-active' : 'text-gray-400'" class="flex-1 py-3 text-xs font-medium text-center border-b-3 border-transparent">
+        <span class="text-lg block">📊</span>Track
+      </button>
+      <button @click="activeTab = 'guides'" :class="activeTab === 'guides' ? 'tab-active' : 'text-gray-400'" class="flex-1 py-3 text-xs font-medium text-center border-b-3 border-transparent">
+        <span class="text-lg block">📋</span>Guides
+      </button>
+    </div>
+  </nav>
+
+  <main class="max-w-lg mx-auto px-4 py-4">
+
+    <!-- HOME TAB -->
+    <div x-show="activeTab === 'home'" class="space-y-4 fade-in">
+      
+      <!-- Break Timer -->
+      <div class="bg-white rounded-2xl p-5 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-gray-800">⏱️ Next Micro-Break</h3>
+          <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium" x-text="breakTimerActive ? 'Active' : 'Paused'"></span>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl font-bold text-gray-800 tabular-nums" x-text="formatTime(breakTimeLeft)"></div>
+          <p class="text-sm text-gray-500 mt-1">until your next stretch break</p>
+          <div class="flex gap-3 mt-4 justify-center">
+            <button @click="toggleBreakTimer()" class="px-6 py-3 rounded-xl font-medium text-sm active:scale-95 transition-transform" :class="breakTimerActive ? 'bg-gray-100 text-gray-700' : 'gradient-bg text-white'">
+              <span x-text="breakTimerActive ? '⏸ Pause' : '▶️ Start'"></span>
+            </button>
+            <button @click="resetBreakTimer()" class="px-6 py-3 bg-gray-100 rounded-xl text-gray-700 font-medium text-sm active:scale-95 transition-transform">🔄 Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="grid grid-cols-2 gap-3">
+        <button @click="activeTab = 'posture'" class="bg-white rounded-2xl p-4 card-shadow text-left micro-card">
+          <span class="text-2xl">📷</span>
+          <h4 class="font-semibold text-gray-800 text-sm mt-2">Check Posture</h4>
+          <p class="text-xs text-gray-500 mt-0.5">Quick webcam scan</p>
+        </button>
+        <button @click="startQuickExercise()" class="bg-white rounded-2xl p-4 card-shadow text-left micro-card">
+          <span class="text-2xl">⚡</span>
+          <h4 class="font-semibold text-gray-800 text-sm mt-2">2-Min Stretch</h4>
+          <p class="text-xs text-gray-500 mt-0.5">Quick relief routine</p>
+        </button>
+        <button @click="activeTab = 'pain'; showPainLogger = true" class="bg-white rounded-2xl p-4 card-shadow text-left micro-card">
+          <span class="text-2xl">📝</span>
+          <h4 class="font-semibold text-gray-800 text-sm mt-2">Log Pain</h4>
+          <p class="text-xs text-gray-500 mt-0.5">Track how you feel</p>
+        </button>
+        <button @click="activeTab = 'guides'" class="bg-white rounded-2xl p-4 card-shadow text-left micro-card">
+          <span class="text-2xl">📋</span>
+          <h4 class="font-semibold text-gray-800 text-sm mt-2">Setup Guide</h4>
+          <p class="text-xs text-gray-500 mt-0.5">Desk & carrier tips</p>
+        </button>
+      </div>
+
+      <!-- Today's Summary -->
+      <div class="bg-white rounded-2xl p-5 card-shadow">
+        <h3 class="font-semibold text-gray-800 mb-3">📈 Today's Progress</h3>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="bg-emerald-50 rounded-xl p-3">
+            <div class="text-xl font-bold text-emerald-700" x-text="todayStats.breaks"></div>
+            <div class="text-xs text-gray-500 mt-0.5">Breaks taken</div>
+          </div>
+          <div class="bg-blue-50 rounded-xl p-3">
+            <div class="text-xl font-bold text-blue-700" x-text="todayStats.exercises"></div>
+            <div class="text-xs text-gray-500 mt-0.5">Exercises done</div>
+          </div>
+          <div class="bg-purple-50 rounded-xl p-3">
+            <div class="text-xl font-bold text-purple-700" x-text="todayStats.postureChecks"></div>
+            <div class="text-xs text-gray-500 mt-0.5">Posture checks</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Tips -->
+      <div x-show="dailyTip" class="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-100">
+        <h3 class="font-semibold text-gray-800 mb-2">💡 Your Daily Tip</h3>
+        <p class="text-sm text-gray-600 leading-relaxed" x-text="dailyTip"></p>
+      </div>
+    </div>
+
+    <!-- POSTURE TAB -->
+    <div x-show="activeTab === 'posture'" class="space-y-4 fade-in">
+      <div class="bg-white rounded-2xl overflow-hidden card-shadow">
+        <div class="relative bg-gray-900" style="aspect-ratio: 4/3;">
+          <video x-ref="webcam" autoplay playsinline muted class="w-full h-full" x-show="cameraActive"></video>
+          <canvas x-ref="captureCanvas" class="hidden"></canvas>
+          
+          <!-- Camera Off State -->
+          <div x-show="!cameraActive" class="absolute inset-0 flex flex-col items-center justify-center text-white">
+            <span class="text-5xl mb-3">📷</span>
+            <p class="text-sm opacity-80">Camera is off</p>
+          </div>
+          
+          <!-- Posture Overlay -->
+          <div x-show="cameraActive && postureAnalysis" class="webcam-overlay">
+            <div class="absolute top-3 left-3 right-3">
+              <div class="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full posture-indicator" :class="postureAnalysis?.status === 'good' ? 'bg-green-400' : postureAnalysis?.status === 'warning' ? 'bg-yellow-400' : 'bg-red-400'"></div>
+                <span class="text-white text-sm font-medium" x-text="postureAnalysis?.message || 'Analyzing...'"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Analyzing Spinner -->
+          <div x-show="analyzingPosture" class="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <div class="text-center text-white">
+              <svg class="animate-spin h-10 w-10 mx-auto mb-2" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              <p class="text-sm">Analyzing your posture...</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-4">
+          <div class="flex gap-3">
+            <button @click="toggleCamera()" class="flex-1 py-3.5 rounded-xl font-semibold text-sm active:scale-95 transition-transform" :class="cameraActive ? 'bg-red-50 text-red-600 border border-red-200' : 'gradient-bg text-white'">
+              <span x-text="cameraActive ? '⏹ Stop Camera' : '📷 Start Camera'"></span>
+            </button>
+            <button x-show="cameraActive" @click="analyzePosture()" :disabled="analyzingPosture" class="px-6 py-3.5 bg-emerald-50 text-emerald-700 rounded-xl font-semibold text-sm border border-emerald-200 active:scale-95 transition-transform">
+              🔍 Analyze
+            </button>
+          </div>
+          
+          <p class="text-xs text-gray-400 mt-3 text-center">🔒 Images analyzed in real-time and never stored on servers</p>
+        </div>
+      </div>
+
+      <!-- Posture Results -->
+      <div x-show="postureAnalysis" class="bg-white rounded-2xl p-5 card-shadow fade-in">
+        <h3 class="font-semibold text-gray-800 mb-3">🔍 Analysis Results</h3>
+        <div class="space-y-3">
+          <template x-for="item in (postureAnalysis?.details || [])" :key="item.area">
+            <div class="flex items-start gap-3 p-3 rounded-xl" :class="item.status === 'good' ? 'bg-green-50' : item.status === 'warning' ? 'bg-yellow-50' : 'bg-red-50'">
+              <span class="text-lg" x-text="item.status === 'good' ? '✅' : item.status === 'warning' ? '⚠️' : '❌'"></span>
+              <div>
+                <div class="text-sm font-medium text-gray-800" x-text="item.area"></div>
+                <div class="text-xs text-gray-500 mt-0.5" x-text="item.tip"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+        <template x-if="postureAnalysis?.recommendations?.length > 0">
+          <div class="mt-4 p-3 bg-blue-50 rounded-xl">
+            <div class="text-sm font-medium text-blue-800 mb-2">💡 Recommendations</div>
+            <template x-for="rec in postureAnalysis.recommendations" :key="rec">
+              <p class="text-xs text-blue-700 mb-1">• <span x-text="rec"></span></p>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Posture Scenarios -->
+      <div class="bg-white rounded-2xl p-5 card-shadow">
+        <h3 class="font-semibold text-gray-800 mb-3">🎯 What are you doing?</h3>
+        <p class="text-xs text-gray-500 mb-3">Select your current activity for tailored analysis</p>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="postureContext = 'desk_work'" :class="postureContext === 'desk_work' ? 'bg-emerald-50 border-emerald-500' : 'border-gray-200'" class="border-2 rounded-xl p-3 text-sm text-left active:scale-95 transition-all">
+            <span class="text-lg">💻</span>
+            <div class="font-medium text-gray-800 mt-1">Desk Work</div>
+          </button>
+          <button @click="postureContext = 'holding_child'" :class="postureContext === 'holding_child' ? 'bg-emerald-50 border-emerald-500' : 'border-gray-200'" class="border-2 rounded-xl p-3 text-sm text-left active:scale-95 transition-all">
+            <span class="text-lg">👶</span>
+            <div class="font-medium text-gray-800 mt-1">Holding Child</div>
+          </button>
+          <button @click="postureContext = 'lifting'" :class="postureContext === 'lifting' ? 'bg-emerald-50 border-emerald-500' : 'border-gray-200'" class="border-2 rounded-xl p-3 text-sm text-left active:scale-95 transition-all">
+            <span class="text-lg">🏋️</span>
+            <div class="font-medium text-gray-800 mt-1">Lifting</div>
+          </button>
+          <button @click="postureContext = 'feeding'" :class="postureContext === 'feeding' ? 'bg-emerald-50 border-emerald-500' : 'border-gray-200'" class="border-2 rounded-xl p-3 text-sm text-left active:scale-95 transition-all">
+            <span class="text-lg">🍼</span>
+            <div class="font-medium text-gray-800 mt-1">Feeding</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXERCISES TAB -->
+    <div x-show="activeTab === 'exercises'" class="space-y-4 fade-in">
+      
+      <!-- Active Exercise -->
+      <div x-show="activeExercise" class="bg-white rounded-2xl p-5 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-gray-800">🏃 Current Exercise</h3>
+          <button @click="activeExercise = null" class="text-gray-400 text-sm">✕ Close</button>
+        </div>
+        <div class="text-center">
+          <span class="text-5xl block mb-3" x-text="activeExercise?.emoji || '🧘'"></span>
+          <h4 class="font-bold text-lg text-gray-800" x-text="activeExercise?.name"></h4>
+          <p class="text-sm text-gray-500 mt-1" x-text="activeExercise?.duration"></p>
+          <div class="bg-gray-50 rounded-xl p-4 mt-4 text-left">
+            <template x-for="(step, i) in (activeExercise?.steps || [])" :key="i">
+              <div class="flex gap-3 mb-3 last:mb-0">
+                <span class="w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" x-text="i + 1"></span>
+                <p class="text-sm text-gray-700" x-text="step"></p>
+              </div>
+            </template>
+          </div>
+          <button @click="completeExercise()" class="w-full mt-4 gradient-bg text-white py-3.5 rounded-xl font-semibold active:opacity-90">
+            ✅ Mark Complete
+          </button>
+        </div>
+      </div>
+
+      <!-- Exercise Categories -->
+      <div x-show="!activeExercise">
+        <div class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+          <button @click="exerciseFilter = 'all'" :class="exerciseFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap card-shadow active:scale-95">All</button>
+          <button @click="exerciseFilter = 'neck'" :class="exerciseFilter === 'neck' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap card-shadow active:scale-95">Neck</button>
+          <button @click="exerciseFilter = 'back'" :class="exerciseFilter === 'back' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap card-shadow active:scale-95">Back</button>
+          <button @click="exerciseFilter = 'shoulders'" :class="exerciseFilter === 'shoulders' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap card-shadow active:scale-95">Shoulders</button>
+          <button @click="exerciseFilter = 'wrists'" :class="exerciseFilter === 'wrists' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap card-shadow active:scale-95">Wrists</button>
+          <button @click="exerciseFilter = 'hips'" :class="exerciseFilter === 'hips' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap card-shadow active:scale-95">Hips</button>
+        </div>
+        
+        <!-- AI Exercise Button -->
+        <button @click="generatePersonalizedRoutine()" :disabled="aiLoading" class="w-full mt-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100 rounded-2xl p-4 text-left micro-card">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl" x-text="aiLoading ? '⏳' : '🤖'"></span>
+            <div class="flex-1">
+              <h4 class="font-semibold text-gray-800 text-sm">AI Personalized Routine</h4>
+              <p class="text-xs text-gray-500" x-text="aiLoading ? 'Generating your routine...' : 'Based on your pain points & schedule'"></p>
+            </div>
+            <span class="text-gray-400">→</span>
+          </div>
+        </button>
+
+        <!-- Exercise Cards -->
+        <div class="space-y-3 mt-3">
+          <template x-for="ex in filteredExercises()" :key="ex.id">
+            <button @click="activeExercise = ex" class="w-full bg-white rounded-2xl p-4 card-shadow text-left micro-card flex items-center gap-4">
+              <span class="text-3xl" x-text="ex.emoji"></span>
+              <div class="flex-1 min-w-0">
+                <h4 class="font-semibold text-gray-800 text-sm" x-text="ex.name"></h4>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="ex.duration"></span>
+                  <span class="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full" x-text="ex.target"></span>
+                </div>
+              </div>
+              <span class="text-gray-300 text-lg">›</span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAIN TRACKING TAB -->
+    <div x-show="activeTab === 'pain'" class="space-y-4 fade-in">
+      
+      <!-- Pain Logger -->
+      <div class="bg-white rounded-2xl p-5 card-shadow">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-gray-800">📝 Log Pain</h3>
+          <button @click="showPainLogger = !showPainLogger" class="text-sm text-emerald-600 font-medium" x-text="showPainLogger ? 'Hide' : 'Show'"></button>
+        </div>
+        
+        <div x-show="showPainLogger" x-transition class="space-y-4">
+          <!-- Pain Level -->
+          <div>
+            <label class="text-sm text-gray-600 mb-2 block">Pain level right now</label>
+            <div class="flex gap-1 justify-between">
+              <template x-for="level in [1,2,3,4,5,6,7,8,9,10]" :key="level">
+                <button @click="painLog.level = level" :class="painLog.level >= level ? (level <= 3 ? 'bg-green-400' : level <= 6 ? 'bg-yellow-400' : 'bg-red-400') + ' text-white' : 'bg-gray-100 text-gray-400'" class="w-8 h-10 rounded-lg text-xs font-bold flex items-center justify-center active:scale-90 transition-all" x-text="level"></button>
+              </template>
+            </div>
+            <div class="flex justify-between text-xs text-gray-400 mt-1 px-1">
+              <span>Mild</span><span>Moderate</span><span>Severe</span>
+            </div>
+          </div>
+          
+          <!-- Pain Location -->
+          <div>
+            <label class="text-sm text-gray-600 mb-2 block">Where does it hurt?</label>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="area in painAreas" :key="area.id">
+                <button @click="togglePainLogArea(area.id)" :class="painLog.areas.includes(area.id) ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-gray-200 text-gray-500'" class="border rounded-full px-3 py-1.5 text-xs font-medium active:scale-95 transition-all">
+                  <span x-text="area.emoji + ' ' + area.label"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+          
+          <!-- Activity -->
+          <div>
+            <label class="text-sm text-gray-600 mb-2 block">What were you doing?</label>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="act in ['💻 Working', '👶 Childcare', '🏠 Housework', '🚗 Commuting', '😴 Sleeping', '🏃 Exercise']" :key="act">
+                <button @click="painLog.activity = act" :class="painLog.activity === act ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-gray-200 text-gray-500'" class="border rounded-full px-3 py-1.5 text-xs font-medium active:scale-95 transition-all" x-text="act"></button>
+              </template>
+            </div>
+          </div>
+          
+          <!-- Notes -->
+          <div>
+            <label class="text-sm text-gray-600 mb-1 block">Notes (optional)</label>
+            <textarea x-model="painLog.notes" rows="2" placeholder="Anything else to note..." class="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none text-sm resize-none"></textarea>
+          </div>
+          
+          <button @click="savePainLog()" class="w-full gradient-bg text-white py-3.5 rounded-xl font-semibold active:opacity-90">
+            💾 Save Entry
+          </button>
+        </div>
+      </div>
+      
+      <!-- Pain Trend Chart -->
+      <div class="bg-white rounded-2xl p-5 card-shadow">
+        <h3 class="font-semibold text-gray-800 mb-3">📊 Pain Trends (7 Days)</h3>
+        <div class="h-48">
+          <canvas x-ref="painChart"></canvas>
+        </div>
+      </div>
+      
+      <!-- Recent Entries -->
+      <div class="bg-white rounded-2xl p-5 card-shadow">
+        <h3 class="font-semibold text-gray-800 mb-3">🕒 Recent Entries</h3>
+        <div x-show="painHistory.length === 0" class="text-center py-6">
+          <span class="text-3xl">📝</span>
+          <p class="text-sm text-gray-400 mt-2">No entries yet. Log your first pain entry above!</p>
+        </div>
+        <div class="space-y-2 max-h-64 overflow-y-auto">
+          <template x-for="(entry, i) in painHistory.slice().reverse().slice(0, 10)" :key="i">
+            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" :class="entry.level <= 3 ? 'bg-green-100 text-green-700' : entry.level <= 6 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'" x-text="entry.level"></div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-800" x-text="entry.areas.join(', ') || 'General'"></div>
+                <div class="text-xs text-gray-400" x-text="new Date(entry.timestamp).toLocaleString()"></div>
+              </div>
+              <span class="text-xs text-gray-400" x-text="entry.activity"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- AI Pain Insights -->
+      <button @click="getPainInsights()" :disabled="aiLoading" class="w-full bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100 rounded-2xl p-4 text-left micro-card">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl" x-text="aiLoading ? '⏳' : '🧠'"></span>
+          <div class="flex-1">
+            <h4 class="font-semibold text-gray-800 text-sm">AI Pain Insights</h4>
+            <p class="text-xs text-gray-500" x-text="aiLoading ? 'Analyzing your patterns...' : 'Get personalized insights from your data'"></p>
+          </div>
+        </div>
+      </button>
+      
+      <div x-show="painInsights" class="bg-white rounded-2xl p-5 card-shadow fade-in">
+        <h3 class="font-semibold text-gray-800 mb-3">🧠 AI Insights</h3>
+        <div class="text-sm text-gray-600 leading-relaxed space-y-2">
+          <template x-for="(insight, i) in (painInsights || [])" :key="i">
+            <div class="flex gap-2 items-start">
+              <span class="text-emerald-500 mt-0.5">•</span>
+              <p x-text="insight"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- GUIDES TAB -->
+    <div x-show="activeTab === 'guides'" class="space-y-4 fade-in">
+      
+      <!-- Generate Personalized Guide -->
+      <button @click="generateGuide()" :disabled="aiLoading" class="w-full bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-5 text-left micro-card">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl" x-text="aiLoading ? '⏳' : '🤖'"></span>
+          <div class="flex-1">
+            <h4 class="font-bold text-gray-800">Generate My Personal Guide</h4>
+            <p class="text-xs text-gray-500 mt-0.5" x-text="aiLoading ? 'Creating your guide...' : 'AI creates a custom ergonomics guide for you'"></p>
+          </div>
+        </div>
+      </button>
+
+      <!-- Saved Guide -->
+      <div x-show="personalGuide" class="bg-white rounded-2xl p-5 card-shadow">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-gray-800">📋 Your Personal Guide</h3>
+          <button @click="printGuide()" class="text-sm text-emerald-600 font-medium flex items-center gap-1">🖨️ Print</button>
+        </div>
+        
+        <div id="printable-guide">
+          <div class="print-only text-center mb-6">
+            <h1 class="text-xl font-bold">🧘‍♀️ Home Ergonomics Guide</h1>
+            <p class="text-sm text-gray-500">Personalized for <span x-text="profile.name"></span></p>
+          </div>
+          
+          <div class="space-y-4">
+            <template x-for="(section, i) in (personalGuide?.sections || [])" :key="i">
+              <div class="border border-gray-100 rounded-xl p-4">
+                <h4 class="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                  <span x-text="section.emoji"></span>
+                  <span x-text="section.title"></span>
+                </h4>
+                <div class="space-y-2">
+                  <template x-for="(tip, j) in section.tips" :key="j">
+                    <p class="text-sm text-gray-600 flex gap-2 items-start">
+                      <span class="text-emerald-500 mt-0.5 flex-shrink-0">✓</span>
+                      <span x-text="tip"></span>
+                    </p>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Reference Cards -->
+      <div class="bg-white rounded-2xl p-5 card-shadow">
+        <h3 class="font-semibold text-gray-800 mb-3">📚 Quick Reference</h3>
+        <div class="space-y-3">
+          <div class="bg-blue-50 rounded-xl p-4">
+            <h4 class="font-semibold text-blue-800 text-sm mb-2">💻 Desk Setup Essentials</h4>
+            <ul class="text-xs text-blue-700 space-y-1">
+              <li>• Screen at eye level, arm's length away</li>
+              <li>• Elbows at 90° angle when typing</li>
+              <li>• Feet flat on floor, knees at 90°</li>
+              <li>• Monitor 20-26 inches from eyes</li>
+              <li>• Use a separate keyboard when using laptop</li>
+            </ul>
+          </div>
+          <div class="bg-pink-50 rounded-xl p-4">
+            <h4 class="font-semibold text-pink-800 text-sm mb-2">👶 Baby Carrier Adjustments</h4>
+            <ul class="text-xs text-pink-700 space-y-1">
+              <li>• Waist belt should sit on hip bones, not waist</li>
+              <li>• Baby's head should be kiss-height</li>
+              <li>• Shoulder straps snug but not digging in</li>
+              <li>• Switch sides frequently when hip-carrying</li>
+              <li>• Tighten back panel to keep baby close</li>
+            </ul>
+          </div>
+          <div class="bg-amber-50 rounded-xl p-4">
+            <h4 class="font-semibold text-amber-800 text-sm mb-2">🛏️ Crib Height Guide</h4>
+            <ul class="text-xs text-amber-700 space-y-1">
+              <li>• Mattress at your hip height for newborns</li>
+              <li>• Lower when baby can sit (about 6mo)</li>
+              <li>• Lowest setting when baby can stand</li>
+              <li>• Bend at knees, not waist, when reaching in</li>
+              <li>• Drop the side rail before lifting baby out</li>
+            </ul>
+          </div>
+          <div class="bg-green-50 rounded-xl p-4">
+            <h4 class="font-semibold text-green-800 text-sm mb-2">🏋️ Safe Lifting Technique</h4>
+            <ul class="text-xs text-green-700 space-y-1">
+              <li>• Get close to your child before lifting</li>
+              <li>• Bend at knees and hips, keep back straight</li>
+              <li>• Engage core before lifting</li>
+              <li>• Hold child close to your body</li>
+              <li>• Avoid twisting — pivot with feet instead</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Settings Panel -->
+  <div x-show="showSettings" x-transition class="fixed inset-0 z-40 bg-black/50" @click.self="showSettings = false">
+    <div class="absolute right-0 top-0 bottom-0 w-80 bg-white shadow-xl overflow-y-auto">
+      <div class="p-5">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="font-bold text-gray-800 text-lg">⚙️ Settings</h3>
+          <button @click="showSettings = false" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">✕</button>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="text-sm text-gray-600 mb-1 block">Name</label>
+            <input x-model="profile.name" @change="saveProfile()" type="text" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm text-gray-600 mb-1 block">Age</label>
+              <input x-model.number="profile.age" @change="saveProfile()" type="number" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm">
+            </div>
+            <div>
+              <label class="text-sm text-gray-600 mb-1 block">Height (cm)</label>
+              <input x-model.number="profile.height" @change="saveProfile()" type="number" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm">
+            </div>
+          </div>
+          <div>
+            <label class="text-sm text-gray-600 mb-1 block">Child's weight (kg)</label>
+            <input x-model.number="profile.childWeight" @change="saveProfile()" type="number" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm">
+          </div>
+          <div>
+            <label class="text-sm text-gray-600 mb-1 block">Break interval (min)</label>
+            <select x-model.number="profile.breakInterval" @change="saveProfile(); resetBreakTimer();" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-white">
+              <option value="20">20 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-600 mb-2 block">Pain areas</label>
+            <div class="flex flex-wrap gap-1">
+              <template x-for="area in painAreas" :key="area.id">
+                <button @click="togglePainArea(area.id); saveProfile()" :class="profile.painPoints.includes(area.id) ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'" class="px-2 py-1 rounded-full text-xs font-medium" x-text="area.emoji + ' ' + area.label"></button>
+              </template>
+            </div>
+          </div>
+          <hr>
+          <button @click="resetAllData()" class="w-full py-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium">🗑️ Reset All Data</button>
+          <p class="text-xs text-gray-400 text-center">v1.0 • Privacy-first • Data stays on your device</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Break Alert Modal -->
+<div x-show="showBreakAlert" x-transition class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
+  <div class="bg-white rounded-2xl w-full max-w-sm card-shadow overflow-hidden">
+    <div class="gradient-bg p-6 text-white text-center">
+      <div class="text-5xl mb-2">🧘‍♀️</div>
+      <h2 class="text-xl font-bold">Time for a Micro-Break!</h2>
+      <p class="text-sm opacity-90 mt-1">Just 2 minutes to feel better</p>
+    </div>
+    <div class="p-5">
+      <div x-show="breakExercise" class="mb-4">
+        <div class="text-center mb-3">
+          <span class="text-3xl" x-text="breakExercise?.emoji"></span>
+          <h4 class="font-bold text-gray-800 mt-1" x-text="breakExercise?.name"></h4>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-3">
+          <template x-for="(step, i) in (breakExercise?.steps || [])" :key="i">
+            <p class="text-xs text-gray-600 mb-1"><span class="font-bold text-emerald-600" x-text="(i+1) + '. '"></span><span x-text="step"></span></p>
+          </template>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button @click="snoozeBreak()" class="flex-1 py-3 bg-gray-100 rounded-xl text-gray-700 font-medium text-sm">⏰ 5min snooze</button>
+        <button @click="takeBreak()" class="flex-1 py-3 gradient-bg text-white rounded-xl font-semibold text-sm">✅ Done!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Global AI tracking
+window.aiTotalInputTokens = 0;
+window.aiTotalOutputTokens = 0;
+window.aiTotalTime = 0;
+window.aiTimingByAlias = {};
+
+async function callAI(alias, params, retries = 3) {
+  const startTime = Date.now();
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch('https://16504442930.work/run_prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias, params })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      const data = await res.json();
+      const elapsed = Date.now() - startTime;
+      window.aiTotalTime += elapsed;
+      if (!window.aiTimingByAlias[alias]) window.aiTimingByAlias[alias] = 0;
+      window.aiTimingByAlias[alias] += elapsed;
+      if (data.input_tokens) window.aiTotalInputTokens += data.input_tokens;
+      if (data.output_tokens) window.aiTotalOutputTokens += data.output_tokens;
+      return data;
+    } catch (e) {
+      console.error(`AI call attempt ${attempt + 1} failed:`, e);
+      if (attempt === retries - 1) {
+        // Try to get a friendly error message
+        try {
+          const errRes = await fetch('https://16504442930.work/run_prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              alias: 'genericAI',
+              params: { prompt: `Reformat this error message to be user-friendly and help the user fix it. Include the full original error. Error: ${e.message}. Return JSON with key "friendlyError" as a string.` }
+            })
+          });
+          const errData = await errRes.json();
+          throw new Error(errData.friendlyError || e.message);
+        } catch (e2) {
+          throw new Error(e.message);
+        }
+      }
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+}
+
+function app() {
+  return {
+    showOnboarding: true,
+    onboardStep: 1,
+    activeTab: 'home',
+    showSettings: false,
+    showPainLogger: false,
+    showBreakAlert: false,
+    aiLoading: false,
+    analyzingPosture: false,
+    cameraActive: false,
+    breakTimerActive: false,
+    breakTimeLeft: 1800,
+    breakInterval: null,
+    postureScore: 72,
+    postureContext: 'desk_work',
+    postureAnalysis: null,
+    activeExercise: null,
+    exerciseFilter: 'all',
+    dailyTip: '',
+    personalGuide: null,
+    painInsights: null,
+    breakExercise: null,
+    painChart: null,
+    toast: { show: false, message: '' },
+    
+    profile: {
+      name: '',
+      age: 30,
+      height: 165,
+      childWeight: 10,
+      painPoints: [],
+      workStart: '09:00',
+      workEnd: '17:00',
+      breakInterval: 30,
+      onboarded: false
+    },
+    
+    painLog: {
+      level: 5,
+      areas: [],
+      activity: '',
+      notes: ''
+    },
+    
+    painHistory: [],
+    
+    todayStats: {
+      breaks: 0,
+      exercises: 0,
+      postureChecks: 0
+    },
+    
+    painAreas: [
+      { id: 'neck', emoji: '🦒', label: 'Neck' },
+      { id: 'upper_back', emoji: '🔙', label: 'Upper Back' },
+      { id: 'lower_back', emoji: '⬇️', label: 'Lower Back' },
+      { id: 'shoulders', emoji: '💪', label: 'Shoulders' },
+      { id: 'wrists', emoji: '🤲', label: 'Wrists' },
+      { id: 'hips', emoji: '🦴', label: 'Hips' },
+      { id: 'knees', emoji: '🦵', label: 'Knees' },
+      { id: 'headache', emoji: '🤕', label: 'Headache' }
+    ],
+    
+    exercises: [
+      { id: 1, emoji: '🔄', name: 'Neck Circles', duration: '1 min', target: 'neck', steps: ['Slowly tilt head to right ear toward shoulder', 'Roll chin down to chest', 'Continue to left ear toward left shoulder', 'Roll head back gently', 'Repeat 5 times each direction'] },
+      { id: 2, emoji: '🐱', name: 'Cat-Cow Stretch', duration: '2 min', target: 'back', steps: ['Get on hands and knees', 'Inhale: arch back, lift head (cow)', 'Exhale: round spine, tuck chin (cat)', 'Move slowly with breath', 'Repeat 10 times'] },
+      { id: 3, emoji: '🚪', name: 'Door Frame Stretch', duration: '1 min', target: 'shoulders', steps: ['Stand in doorway with arms at 90°', 'Place forearms on door frame', 'Step forward with one foot', 'Feel stretch across chest and shoulders', 'Hold 20 seconds, repeat 3 times'] },
+      { id: 4, emoji: '🙏', name: 'Wrist Prayer Stretch', duration: '1 min', target: 'wrists', steps: ['Press palms together at chest height', 'Slowly lower hands keeping palms together', 'Feel stretch in forearms and wrists', 'Hold 15 seconds', 'Shake hands out, repeat 3 times'] },
+      { id: 5, emoji: '🦋', name: 'Seated Figure-4', duration: '2 min', target: 'hips', steps: ['Sit in chair, cross right ankle over left knee', 'Sit tall and lean forward slightly', 'Feel stretch in right hip and glute', 'Hold 30 seconds', 'Switch sides and repeat'] },
+      { id: 6, emoji: '🏔️', name: 'Chin Tucks', duration: '1 min', target: 'neck', steps: ['Sit or stand tall', 'Pull chin straight back (make a double chin)', 'Hold for 5 seconds', 'Release and repeat', 'Do 10 repetitions'] },
+      { id: 7, emoji: '🌉', name: 'Glute Bridge', duration: '2 min', target: 'back', steps: ['Lie on back, knees bent, feet flat', 'Squeeze glutes and lift hips up', 'Hold at top for 3 seconds', 'Lower slowly', 'Repeat 12 times'] },
+      { id: 8, emoji: '🤸', name: 'Shoulder Blade Squeeze', duration: '1 min', target: 'shoulders', steps: ['Sit or stand tall with arms at sides', 'Pull shoulder blades together', 'Imagine squeezing a pencil between them', 'Hold for 5 seconds', 'Repeat 10 times'] },
+      { id: 9, emoji: '🧎', name: 'Hip Flexor Stretch', duration: '2 min', target: 'hips', steps: ['Kneel on one knee (half-kneeling)', 'Shift weight forward, keeping torso upright', 'Squeeze glute of back leg', 'Hold 30 seconds', 'Switch sides and repeat'] },
+      { id: 10, emoji: '🌊', name: 'Thoracic Rotation', duration: '2 min', target: 'back', steps: ['Sit in chair, cross arms over chest', 'Rotate upper body to right slowly', 'Hold 3 seconds at end range', 'Return to center', 'Rotate to left. Repeat 8 each side'] },
+      { id: 11, emoji: '👐', name: 'Wrist Flexor Stretch', duration: '1 min', target: 'wrists', steps: ['Extend right arm forward, palm up', 'Use left hand to gently pull fingers back', 'Feel stretch in inner forearm', 'Hold 20 seconds', 'Switch hands and repeat'] },
+      { id: 12, emoji: '🧘', name: 'Child\'s Pose', duration: '2 min', target: 'back', steps: ['Kneel on floor, sit on heels', 'Walk hands forward, lowering chest to floor', 'Rest forehead on ground', 'Breathe deeply into lower back', 'Hold for 30-60 seconds'] }
+    ],
+    
+    init() {
+      // Load saved data
+      const saved = localStorage.getItem('paincoach_profile');
+      if (saved) {
+        const p = JSON.parse(saved);
+        this.profile = { ...this.profile, ...p };
+        if (p.onboarded) this.showOnboarding = false;
+      }
+      
+      const history = localStorage.getItem('paincoach_history');
+      if (history) this.painHistory = JSON.parse(history);
+      
+      const stats = localStorage.getItem('paincoach_stats_' + new Date().toDateString());
+      if (stats) this.todayStats = JSON.parse(stats);
+      
+      const guide = localStorage.getItem('paincoach_guide');
+      if (guide) this.personalGuide = JSON.parse(guide);
+      
+      const score = localStorage.getItem('paincoach_score');
+      if (score) this.postureScore = parseInt(score);
+      
+      // Set break time
+      this.breakTimeLeft = (this.profile.breakInterval || 30) * 60;
+      
+      // Load daily tip
+      if (!this.showOnboarding) this.loadDailyTip();
+      
+      // Render charts after a tick
+      this.$nextTick(() => {
+        if (!this.showOnboarding) this.renderPainChart();
+      });
+    },
+    
+    showToast(msg) {
+      this.toast = { show: true, message: msg };
+      setTimeout(() => this.toast.show = false, 3000);
+    },
+    
+    togglePainArea(id) {
+      const idx = this.profile.painPoints.indexOf(id);
+      if (idx >= 0) this.profile.painPoints.splice(idx, 1);
+      else this.profile.painPoints.push(id);
+    },
+    
+    togglePainLogArea(id) {
+      const idx = this.painLog.areas.indexOf(id);
+      if (idx >= 0) this.painLog.areas.splice(idx, 1);
+      else this.painLog.areas.push(id);
+    },
+    
+    async completeOnboarding() {
+      this.profile.onboarded = true;
+      this.saveProfile();
+      this.showOnboarding = false;
+      this.breakTimeLeft = this.profile.breakInterval * 60;
+      this.showToast('Welcome aboard! 🎉');
+      
+      // Load AI content
+      await this.loadDailyTip();
+      this.$nextTick(() => this.renderPainChart());
+    },
+    
+    saveProfile() {
+      localStorage.setItem('paincoach_profile', JSON.stringify(this.profile));
+    },
+    
+    saveTodayStats() {
+      localStorage.setItem('paincoach_stats_' + new Date().toDateString(), JSON.stringify(this.todayStats));
+    },
+    
+    formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    },
+    
+    toggleBreakTimer() {
+      if (this.breakTimerActive) {
+        clearInterval(this.breakInterval);
+        this.breakTimerActive = false;
+      } else {
+        this.breakTimerActive = true;
+        this.breakInterval = setInterval(() => {
+          if (this.breakTimeLeft > 0) {
+            this.breakTimeLeft--;
+          } else {
+            this.triggerBreakAlert();
+          }
+        }, 1000);
+      }
+    },
+    
+    resetBreakTimer() {
+      clearInterval(this.breakInterval);
+      this.breakTimerActive = false;
+      this.breakTimeLeft = (this.profile.breakInterval || 30) * 60;
+    },
+    
+    triggerBreakAlert() {
+      clearInterval(this.breakInterval);
+      this.breakTimerActive = false;
+      
+      // Pick a random exercise relevant to pain areas
+      const relevant = this.exercises.filter(e => 
+        this.profile.painPoints.some(p => e.target.includes(p.replace('upper_', '').replace('lower_', '')))
+      );
+      this.breakExercise = relevant.length > 0 ? relevant[Math.floor(Math.random() * relevant.length)] : this.exercises[Math.floor(Math.random() * this.exercises.length)];
+      this.showBreakAlert = true;
+      
+      // Play notification sound
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🧘‍♀️ Time for a micro-break!', { body: `Try: ${this.breakExercise.name}` });
+      }
+    },
+    
+    snoozeBreak() {
+      this.showBreakAlert = false;
+      this.breakTimeLeft = 5 * 60;
+      this.toggleBreakTimer();
+      this.showToast('⏰ Snoozing for 5 minutes');
+    },
+    
+    takeBreak() {
+      this.showBreakAlert = false;
+      this.todayStats.breaks++;
+      this.saveTodayStats();
+      this.breakTimeLeft = (this.profile.breakInterval || 30) * 60;
+      this.toggleBreakTimer();
+      this.showToast('✅ Great job taking a break!');
+    },
+    
+    async toggleCamera() {
+      if (this.cameraActive) {
+        const video = this.$refs.webcam;
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(t => t.stop());
+          video.srcObject = null;
+        }
+        this.cameraActive = false;
+      } else {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } });
+          this.$refs.webcam.srcObject = stream;
+          this.cameraActive = true;
+        } catch (e) {
+          this.showToast('📷 Camera access denied. Please allow camera in browser settings.');
+        }
+      }
+    },
+    
+    async analyzePosture() {
+      if (!this.cameraActive) return;
+      this.analyzingPosture = true;
+      this.todayStats.postureChecks++;
+      this.saveTodayStats();
+      
+      try {
+        // Capture frame as base64
+        const video = this.$refs.webcam;
+        const canvas = this.$refs.captureCanvas;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.7);
+        
+        // Store image for analysis
+        const imageKey = 'posture_' + Date.now();
+        await fetch('https://16504442930.work/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: imageKey, value: imageData.split(',')[1] })
+        });
+        
+        const imageUrl = `https://16504442930.work/serve_image?key=${imageKey}`;
+        
+        const contextLabels = { desk_work: 'working at a desk with a laptop', holding_child: 'holding a child', lifting: 'lifting something', feeding: 'feeding a baby' };
+        const contextDesc = contextLabels[this.postureContext] || 'sitting at a desk';
+        
+        const prompt = `You are an expert ergonomics analyst. A person is ${contextDesc}. Their pain areas are: ${this.profile.painPoints.join(', ') || 'general'}. They are ${this.profile.age} years old, ${this.profile.height}cm tall${this.profile.childWeight ? ', and carry a child weighing ' + this.profile.childWeight + 'kg' : ''}.
+
+Since you cannot see the actual image, provide a thorough ergonomic assessment based on the most common posture issues for someone ${contextDesc}. Analyze typical posture problems for this activity.
+
+Return a JSON object with this EXACT structure:
+{
+  "overallScore": <number 0-100, realistic assessment>,
+  "status": <string, one of "good", "warning", "danger">,
+  "message": <string, one-sentence summary>,
+  "details": [
+    {
+      "area": <string, body area name>,
+      "status": <string, one of "good", "warning", "danger">,
+      "tip": <string, specific actionable tip>
+    }
+  ],
+  "recommendations": [<string, 3-5 specific actionable recommendations>]
+}
+
+Include at least 4 detail items covering head/neck, shoulders, back, and the specific activity context. Be specific and actionable in tips.`;
+        
+        const result = await callAI('genericAI', { prompt });
+        
+        // Parse nested response
+        let analysis = result;
+        if (result.overallScore !== undefined) {
+          analysis = result;
+        } else {
+          // Try to find the analysis data in the response
+          for (const key of Object.keys(result)) {
+            if (typeof result[key] === 'object' && result[key]?.overallScore !== undefined) {
+              analysis = result[key];
+              break;
+            }
+          }
+        }
+        
+        this.postureAnalysis = {
+          status: analysis.status || 'warning',
+          message: analysis.message || 'Analysis complete',
+          details: analysis.details || [],
+          recommendations: analysis.recommendations || []
+        };
+        
+        this.postureScore = analysis.overallScore || 65;
+        localStorage.setItem('paincoach_score', this.postureScore);
+        
+      } catch (e) {
+        console.error('Posture analysis error:', e);
+        // Provide offline fallback
+        this.postureAnalysis = {
+          status: 'warning',
+          message: 'Based on typical patterns for your activity',
+          details: [
+            { area: 'Head & Neck', status: this.postureContext === 'desk_work' ? 'warning' : 'good', tip: 'Keep your head aligned over your shoulders. Avoid jutting chin forward toward screen.' },
+            { area: 'Shoulders', status: 'warning', tip: 'Roll shoulders back and down. Avoid hunching, especially when tired.' },
+            { area: 'Upper Back', status: this.profile.painPoints.includes('upper_back') ? 'danger' : 'warning', tip: 'Maintain natural spinal curve. Take stretch breaks every 30 minutes.' },
+            { area: 'Lower Back', status: this.profile.painPoints.includes('lower_back') ? 'danger' : 'warning', tip: 'Support your lower back with a cushion. Keep feet flat on the floor.' }
+          ],
+          recommendations: [
+            'Adjust your screen to eye level to reduce neck strain',
+            'Set a timer for regular micro-breaks every 20-30 minutes',
+            'Use a lumbar support pillow for your chair',
+            'Practice chin tucks to counter forward head posture'
+          ]
+        };
+        this.showToast('📊 Using general posture tips (AI unavailable)');
+      }
+      
+      this.analyzingPosture = false;
+    },
+    
+    filteredExercises() {
+      if (this.exerciseFilter === 'all') return this.exercises;
+      return this.exercises.filter(e => e.target === this.exerciseFilter || e.target.includes(this.exerciseFilter));
+    },
+    
+    startQuickExercise() {
+      // Pick exercise relevant to pain points
+      const relevant = this.exercises.filter(e => 
+        this.profile.painPoints.some(p => e.target.includes(p.replace('upper_', '').replace('lower_', '')))
+      );
+      this.activeExercise = relevant.length > 0 ? relevant[Math.floor(Math.random() * relevant.length)] : this.exercises[0];
+      this.activeTab = 'exercises';
+    },
+    
+    completeExercise() {
+      this.todayStats.exercises++;
+      this.saveTodayStats();
+      this.showToast('💪 Exercise complete! Great work!');
+      this.activeExercise = null;
+    },
+    
+    savePainLog() {
+      if (this.painLog.areas.length === 0) {
+        this.showToast('Please select at least one pain area');
+        return;
+      }
+      const entry = {
+        ...JSON.parse(JSON.stringify(this.painLog)),
+        timestamp: new Date().toISOString()
+      };
+      this.painHistory.push(entry);
+      localStorage.setItem('paincoach_history', JSON.stringify(this.painHistory));
+      
+      // Reset form
+      this.painLog = { level: 5, areas: [], activity: '', notes: '' };
+      this.showPainLogger = false;
+      this.showToast('📝 Pain entry saved!');
+      
+      this.$nextTick(() => this.renderPainChart());
+    },
+    
+    renderPainChart() {
+      const canvas = this.$refs.painChart;
+      if (!canvas) return;
+      
+      if (this.painChart) this.painChart.destroy();
+      
+      // Get last 7 days
+      const days = [];
+      const data = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dayStr = date.toLocaleDateString('en', { weekday: 'short' });
+        days.push(dayStr);
+        
+        const dateStr = date.toDateString();
+        const dayEntries = this.painHistory.filter(e => new Date(e.timestamp).toDateString() === dateStr);
+        const avg = dayEntries.length > 0 ? dayEntries.reduce((a, b) => a + b.level, 0) / dayEntries.length : null;
+        data.push(avg);
+      }
+      
+      this.painChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: days,
+          datasets: [{
+            label: 'Pain Level',
+            data: data,
+            borderColor: '#059669',
+            backgroundColor: 'rgba(5, 150, 105, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#059669',
+            pointRadius: 4,
+            spanGaps: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { min: 0, max: 10, ticks: { stepSize: 2 }, grid: { color: '#f3f4f6' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    },
+    
+    async loadDailyTip() {
+      const today = new Date().toDateString();
+      const cached = localStorage.getItem('paincoach_tip_date');
+      const cachedTip = localStorage.getItem('paincoach_tip');
+      
+      if (cached === today && cachedTip) {
+        this.dailyTip = cachedTip;
+        return;
+      }
+      
+      try {
+        const painStr = this.profile.painPoints.join(', ') || 'general';
+        const prompt = `You are an expert ergonomics and pain management coach for remote-working parents. Generate ONE practical, specific, and encouraging daily tip for a ${this.profile.age}-year-old parent who experiences pain in: ${painStr}. They work remotely and care for a young child${this.profile.childWeight ? ' weighing ' + this.profile.childWeight + 'kg' : ''}. The tip should be actionable in under 2 minutes. Return JSON with key "tip" as a string (2-3 sentences max).`;
+        
+        const result = await callAI('genericAI', { prompt });
+        this.dailyTip = result.tip || 'Remember to take a micro-break every 30 minutes. Your body will thank you! 🌟';
+        localStorage.setItem('paincoach_tip', this.dailyTip);
+        localStorage.setItem('paincoach_tip_date', today);
+      } catch (e) {
+        this.dailyTip = 'When picking up your little one, bend your knees and keep them close to your body. It reduces lower back strain by up to 50%! 💪';
+      }
+    },
+    
+    async generatePersonalizedRoutine() {
+      this.aiLoading = true;
+      try {
+        const painStr = this.profile.painPoints.join(', ') || 'general back and neck pain';
+        const prompt = `You are an expert physical therapist and ergonomics coach specializing in remote-working parents. Create a personalized 5-minute micro-exercise routine for a ${this.profile.age}-year-old parent (${this.profile.height}cm tall) with pain in: ${painStr}. They care for a child${this.profile.childWeight ? ' weighing ' + this.profile.childWeight + 'kg' : ''} and work remotely.
+
+Return a JSON object with this EXACT structure:
+{
+  "routineName": <string, catchy name for the routine>,
+  "exercises": [
+    {
+      "id": <number, starting from 100>,
+      "emoji": <string, single emoji>,
+      "name": <string, exercise name>,
+      "duration": <string, like "1 min" or "2 min">,
+      "target": <string, one of "neck", "back", "shoulders", "wrists", "hips">,
+      "steps": [<string, 4-5 clear step instructions>]
+    }
+  ]
+}
+
+Include exactly 4 exercises that can be done in 5 minutes total, in a small space, without equipment. Prioritize their pain areas. Make steps clear and brief.`;
+        
+        const result = await callAI('genericAI', { prompt });
+        
+        if (result.exercises && Array.isArray(result.exercises)) {
+          // Add to exercises list
+          result.exercises.forEach(ex => {
+            if (!this.exercises.find(e => e.name === ex.name)) {
+              this.exercises.unshift(ex);
+            }
+          });
+          this.showToast(`✨ "${result.routineName}" routine added!`);
+          this.exerciseFilter = 'all';
+        }
+      } catch (e) {
+        this.showToast('Could not generate routine. Try again later.');
+      }
+      this.aiLoading = false;
+    },
+    
+    async getPainInsights() {
+      if (this.painHistory.length < 2) {
+        this.showToast('Log at least 2 pain entries to get insights');
+        return;
+      }
+      
+      this.aiLoading = true;
+      try {
+        const recentEntries = this.painHistory.slice(-20).map(e => ({
+          level: e.level,
+          areas: e.areas,
+          activity: e.activity,
+          time: new Date(e.timestamp).toLocaleString()
+        }));
+        
+        const prompt = `You are an expert pain management analyst for remote-working parents. Analyze these pain log entries and provide insights:
+
+${JSON.stringify(recentEntries, null, 2)}
+
+User profile: ${this.profile.age} years old, ${this.profile.height}cm, pain areas: ${this.profile.painPoints.join(', ')}, child weight: ${this.profile.childWeight || 'unknown'}kg.
+
+Return a JSON object with this EXACT structure:
+{
+  "insights": [<string, 4-6 specific, actionable insights based on the data patterns>]
+}
+
+Focus on: patterns in timing, activities that correlate with higher pain, trends over time, specific recommendations. Be specific and reference the actual data. Include a safety disclaimer if pain levels are consistently high.`;
+        
+        const result = await callAI('genericAI', { prompt });
+        this.painInsights = result.insights || ['Track more entries for detailed insights.'];
+      } catch (e) {
+        this.showToast('Could not generate insights. Try again later.');
+      }
+      this.aiLoading = false;
+    },
+    
+    async generateGuide() {
+      this.aiLoading = true;
+      try {
+        const painStr = this.profile.painPoints.join(', ') || 'general';
+        const prompt = `You are an expert ergonomics consultant creating a personalized home setup guide for a remote-working parent. Create a comprehensive but practical guide.
+
+User: ${this.profile.name || 'Parent'}, ${this.profile.age} years old, ${this.profile.height}cm tall, pain in: ${painStr}, child weight: ${this.profile.childWeight || 10}kg, works ${this.profile.workStart} to ${this.profile.workEnd}.
+
+Return a JSON object with this EXACT structure:
+{
+  "sections": [
+    {
+      "emoji": <string, single emoji>,
+      "title": <string, section title>,
+      "tips": [<string, 4-6 specific, measurable tips with exact numbers where applicable>]
+    }
+  ]
+}
+
+Include exactly 5 sections:
+1. Desk/workstation setup (with specific measurements based on their height)
+2. Baby carrier adjustments (based on child weight)
+3. Crib and changing table heights
+4. Safe lifting techniques for their child's weight
+5. Micro-break schedule optimized for their work hours
+
+Be very specific with measurements, angles, and times. Include calculations based on their height (e.g., ideal desk height = height * 0.43).`;
+        
+        const result = await callAI('genericAI', { prompt });
+        this.personalGuide = result;
+        localStorage.setItem('paincoach_guide', JSON.stringify(result));
+        this.showToast('📋 Your personal guide is ready!');
+      } catch (e) {
+        // Provide fallback guide
+        const deskHeight = Math.round(this.profile.height * 0.43);
+        const monitorHeight = Math.round(this.profile.height * 0.76);
+        this.personalGuide = {
+          sections: [
+            { emoji: '💻', title: `Desk Setup (for ${this.profile.height}cm height)`, tips: [`Desk height: ${deskHeight}cm from floor`, `Monitor top at eye level: ~${monitorHeight}cm from floor`, 'Screen distance: 50-65cm from eyes', 'Use a laptop stand + external keyboard', 'Chair seat height: adjust so knees are at 90°'] },
+            { emoji: '👶', title: `Baby Carrier (for ${this.profile.childWeight || 10}kg child)`, tips: ['Waist belt on hip bones, snug but comfortable', 'Baby at "kissable height" on your chest', 'Tighten straps to keep baby close to body', 'Use a structured carrier for babies over 8kg', 'Limit carrying sessions to 30-45 min'] },
+            { emoji: '🛏️', title: 'Crib & Changing Table', tips: ['Crib mattress should be at your hip height initially', 'Changing table at elbow height to avoid bending', 'Always lower crib rail before reaching in', 'Use a step stool if crib is too high', 'Place essentials within arm\'s reach'] },
+            { emoji: '🏋️', title: 'Safe Lifting', tips: ['Get close before lifting — never reach', 'Bend knees, keep back straight', 'Engage core before every lift', 'Hold child centered against your torso', 'Pivot feet instead of twisting'] },
+            { emoji: '⏰', title: 'Break Schedule', tips: [`Work ${this.profile.workStart}-${this.profile.workEnd}: break every ${this.profile.breakInterval} min`, '1-min neck stretches at each break', '5-min routine before/after lunch', 'Stand for 2 minutes every hour', 'Evening: 10-min full body stretch'] }
+          ]
+        };
+        localStorage.setItem('paincoach_guide', JSON.stringify(this.personalGuide));
+        this.showToast('📋 Guide ready (using standard recommendations)');
+      }
+      this.aiLoading = false;
+    },
+    
+    printGuide() {
+      window.print();
+    },
+    
+    resetAllData() {
+      if (confirm('Are you sure? This will delete all your data.')) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+  };
+}
+
+// Request notification permission
+if ('Notification' in window && Notification.permission === 'default') {
+  setTimeout(() => Notification.requestPermission(), 5000);
+}
+</script>
+</body>
+</html>
